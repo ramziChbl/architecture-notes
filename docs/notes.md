@@ -8,4 +8,14 @@
 
 # Cool discoveries
 
-* Use `default_tags` define default tags at the provider level of your Terraform configuration. [blog](https://www.hashicorp.com/en/blog/default-tags-in-the-terraform-aws-provider)
+* Use `default_tags` to define default tags at the provider level of your Terraform configuration. [blog](https://www.hashicorp.com/en/blog/default-tags-in-the-terraform-aws-provider)
+*   **MFA for IAM Operations:** When using an IAM user, AWS may enforce MFA for sensitive operations like creating IAM roles, even if the user has `AdministratorAccess`. https://docs.aws.amazon.com/STS/latest/APIReference/API_GetSessionToken.html
+
+  ```
+   Permissions
+
+    The temporary security credentials created by GetSessionToken can be used to make API calls to any AWS service with the following exceptions:
+        You cannot call any IAM API operations unless MFA authentication information is included in the request.
+        You cannot call any AWS STS API except AssumeRole or GetCallerIdentity.
+
+  ```

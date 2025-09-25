@@ -1,17 +1,39 @@
-terraform {
-  backend "local" {}
-}
-
-provider "aws" {
-  region = "us-east-1"
-}
-
 data "terraform_remote_state" "shared" {
   backend = "local"
 
   config = {
     path = "../shared/terraform.tfstate"
   }
+}
+
+resource "aws_subnet" "ecs_a" {
+  vpc_id            = data.terraform_remote_state.shared.outputs.vpc_id
+  cidr_block        = var.ecs_subnet_a_cidr_block
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name = "ecs-subnet-a"
+  }
+}
+
+resource "aws_subnet" "ecs_b" {
+  vpc_id            = data.terraform_remote_state.shared.outputs.vpc_id
+  cidr_block        = var.ecs_subnet_b_cidr_block
+  availability_zone = "us-east-1b"
+
+  tags = {
+    Name = "ecs-subnet-b"
+  }
+}
+
+resource "aws_route_table_association" "ecs_a" {
+  subnet_id      = aws_subnet.ecs_a.id
+  route_table_id = data.terraform_remote_state.shared.outputs.public_route_table_id
+}
+
+resource "aws_route_table_association" "ecs_b" {
+  subnet_id      = aws_subnet.ecs_b.id
+  route_table_id = data.terraform_remote_state.shared.outputs.public_route_table_id
 }
 
 resource "aws_ecs_cluster" "main" {
@@ -72,7 +94,7 @@ resource "aws_ecs_service" "main" {
   desired_count   = 2
 
   network_configuration {
-    subnets         = data.terraform_remote_state.shared.outputs.ecs_subnet_ids
+    subnets         = [aws_subnet.ecs_a.id, aws_subnet.ecs_b.id]
     assign_public_ip = true
   }
 

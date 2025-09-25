@@ -1,17 +1,45 @@
-terraform {
-  backend "local" {}
-}
-
-provider "aws" {
-  region = "us-east-1"
-}
-
 data "terraform_remote_state" "shared" {
   backend = "local"
 
   config = {
     path = "../shared/terraform.tfstate"
   }
+}
+
+resource "aws_subnet" "eks_a" {
+  vpc_id            = data.terraform_remote_state.shared.outputs.vpc_id
+  cidr_block        = var.eks_subnet_a_cidr_block
+  availability_zone = "us-east-1a"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name                                = "eks-subnet-a"
+    "kubernetes.io/cluster/eks-cluster" = "shared"
+    "kubernetes.io/role/elb"            = "1"
+  }
+}
+
+resource "aws_subnet" "eks_b" {
+  vpc_id            = data.terraform_remote_state.shared.outputs.vpc_id
+  cidr_block        = var.eks_subnet_b_cidr_block
+  availability_zone = "us-east-1b"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name                                = "eks-subnet-b"
+    "kubernetes.io/cluster/eks-cluster" = "shared"
+    "kubernetes.io/role/elb"            = "1"
+  }
+}
+
+resource "aws_route_table_association" "eks_a" {
+  subnet_id      = aws_subnet.eks_a.id
+  route_table_id = data.terraform_remote_state.shared.outputs.public_route_table_id
+}
+
+resource "aws_route_table_association" "eks_b" {
+  subnet_id      = aws_subnet.eks_b.id
+  route_table_id = data.terraform_remote_state.shared.outputs.public_route_table_id
 }
 
 resource "aws_iam_role" "eks_cluster" {
@@ -43,7 +71,7 @@ resource "aws_eks_cluster" "main" {
   role_arn = aws_iam_role.eks_cluster.arn
 
   vpc_config {
-    subnet_ids = data.terraform_remote_state.shared.outputs.eks_subnet_ids
+    subnet_ids = [aws_subnet.eks_a.id, aws_subnet.eks_b.id]
   }
 
   depends_on = [
@@ -89,9 +117,9 @@ resource "aws_eks_node_group" "main" {
   cluster_name    = aws_eks_cluster.main.name
   node_group_name = "eks-node-group"
   node_role_arn   = aws_iam_role.eks_node.arn
-  subnet_ids      = data.terraform_remote_state.shared.outputs.eks_subnet_ids
+  subnet_ids      = [aws_subnet.eks_a.id, aws_subnet.eks_b.id]
 
-  scaling_.config {
+  scaling_config {
     desired_size = 2
     max_size     = 2
     min_size     = 1
